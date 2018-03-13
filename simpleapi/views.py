@@ -4,7 +4,7 @@
 # @Email:  valle.mrv@gmail.com
 # @Filename: views.py
 # @Last modified by:   valle
-# @Last modified time: 27-Dec-2017
+# @Last modified time: 10-Mar-2018
 # @License: Apache license vesion 2.0
 
 
@@ -12,7 +12,7 @@ from django.conf import settings
 from tokenapi.decorators import token_required
 from django.views.decorators.csrf import csrf_exempt
 from tokenapi.http import JsonResponse, JsonError
-from simplex_db import Model, QSonHelper as QSonHelperDjango
+from .simplex_db import Model, QSonHelper as QSonHelperDjango
 import json
 
 # Create your views here.

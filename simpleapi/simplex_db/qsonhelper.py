@@ -5,17 +5,17 @@
 # @Email:  valle.mrv@gmail.com
 # @Filename: controllers.py
 # @Last modified by:   valle
-# @Last modified time: 20-Feb-2018
+# @Last modified time: 10-Mar-2018
 # @License: Apache license vesion 2.0
 
 import os
 import importlib
-from models import Model
 from django.forms.models import model_to_dict
 from django.core import serializers
 from django.conf import settings
 from tokenapi.http import JsonError
 from django.http import Http404
+from .models import Model
 
 class HelperBase(object):
     def __init__(self, JSONQuery, JSONResult):
@@ -24,8 +24,6 @@ class HelperBase(object):
         self.db = JSONQuery.get("db")
         self.rows = JSONQuery.get("rows")
         self.tipo = None
-        if "tipo" in JSONQuery:
-            self.tipo = JSONQuery.get("tipo")
         for row in self.rows:
             self.action(row)
 
@@ -41,14 +39,12 @@ class HelperBase(object):
         class_model = self.get_class(name)
         return class_model.objects.filter(**filter)
 
-    def execute_all(self, name):
-        class_model = self.get_class(name)
-        return class_model.objects.all()
 
     def get_rows(self, qson):
         rows = self.execute_filter(qson['db_table'], qson['filter'])
         if len(qson["exclude"]) > 0:
-            rows = rows.exclude(**qson["exclude"])
+            for ex in qson["exclude"]:
+                rows = rows.exclude(**ex)
         return rows
 
 
@@ -103,16 +99,12 @@ class GetHelper(HelperBase):
         result = self.JSONResult["get"]
         if tb not in result:
             result[tb] = []
-        if self.tipo == "all":
-            rows = self.execute_all(qson['db_table'])
-            for row in rows:
-                result[tb].append(Model.model_to_dict(row))
-        else:
-            rows = self.get_rows(qson)
-            for row in rows:
-                row_send = Model.model_to_dict(row)
-                self.read_child(row, qson["childs"], row_send)
-                result[tb].append(row_send)
+
+        rows = self.get_rows(qson)
+        for row in rows:
+            row_send = Model.model_to_dict(row)
+            self.read_child(row, qson["childs"], row_send)
+            result[tb].append(row_send)
 
 
 
@@ -142,20 +134,46 @@ class RmHelper(HelperBase):
 
         rows = self.get_rows(qson)
         if len(qson["childs"]) <= 0:
-            result[tb] = {'rows_delete': len(rows)}
+            row_send = Model.model_to_dict(row, "id")
+            row_send['rows_delete':  len(rows)]
+            result[tb] = row_send
             self.delete_rows(rows)
         else:
-            rows = self.get_rows(qson)
             for row in rows:
-                row_send = Model.model_to_dict(row)
+                row_send = Model.model_to_dict(row, "id")
                 for child in qson["childs"]:
                     field = child["relation_field"]
-                    row_send[field] = {'rows_delete': Model.delete(row, field, child["tipo"], child["filter"])}
+                    row_send[field] = {'rows_delete': Model.delete(row, field, child["filter"], child["exclude"])}
                 result[tb].append(row_send)
 
     def delete_rows(self, rows):
         for row in rows:
             row.delete();
+
+class JoinHelper(HelperBase):
+
+    def action(self, qson):
+        tb = qson["db_table"].lower()
+        rows = []
+        if not 'join' in self.JSONResult:
+            self.JSONResult["join"] = {}
+        result = self.JSONResult["join"]
+        if tb not in result:
+            result[tb] = []
+
+        rows = self.get_rows(qson)
+        if len(qson["childs"]) <= 0:
+            row_send = Model.model_to_dict(row, "id")
+            row_send['rows_joined':  0]
+            result[tb] = row_send
+        else:
+            for row in rows:
+                row_send = Model.model_to_dict(row, "id")
+                for child in qson["childs"]:
+                    field = child["relation_field"]
+                    row_send[field] = {'rows_joined': Model.join(row, field, child["filter"], child["exclude"])}
+                result[tb].append(row_send)
+
 
 
 class QSonHelper(object):
@@ -177,6 +195,11 @@ class QSonHelper(object):
             if "rm" == name:
                 QSONRequire = qson.get("rm")
                 RmHelper(JSONQuery=QSONRequire,
+                        JSONResult=self.JSONResult)
+
+            if "join" == name:
+                QSONRequire = qson.get("join")
+                JoinHelper(JSONQuery=QSONRequire,
                         JSONResult=self.JSONResult)
 
         return self.JSONResult
