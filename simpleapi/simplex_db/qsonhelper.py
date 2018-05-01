@@ -5,7 +5,7 @@
 # @Email:  valle.mrv@gmail.com
 # @Filename: controllers.py
 # @Last modified by:   valle
-# @Last modified time: 10-Mar-2018
+# @Last modified time: 24-Apr-2018
 # @License: Apache license vesion 2.0
 
 import os
@@ -32,7 +32,7 @@ class HelperBase(object):
         try:
             return getattr(modulo, name)
         except AttributeError as a:
-            print(str(a))
+            print("Error %s" % str(a))
             return None
 
     def execute_filter(self, name, filter):
@@ -60,16 +60,20 @@ class AddHelper(HelperBase):
         if row != None:
             row.save()
             row_send = Model.model_to_dict(row)
-            self.JSONResult['add'][tb].append(row_send)
-            for qson_child in qson["childs"]:
-                row_child = self.modify_row(qson_child)
-                tb = qson_child["db_table"].lower()
-                if tb not in self.JSONResult["add"]:
-                    self.JSONResult["add"][tb] = []
-                tb = qson_child["db_table"].lower()
-                Model.child_add(qson_child, row, row_child)
-                row_send = Model.model_to_dict(row_child)
-                self.JSONResult['add'][tb].append(row_send)
+            result_send = self.JSONResult['add'][tb]
+            result_send.append(row_send)
+            self.save_child(row, qson["childs"], row_send)
+
+    def save_child(self, row, qson, row_send):
+        for qson_child in qson:
+            row_child = self.modify_row(qson_child)
+            tb = qson_child["db_table"].lower()
+            if tb not in row_send:
+                row_send[tb] = []
+            Model.child_add(qson_child, row, row_child)
+            row_child_send = Model.model_to_dict(row_child)
+            row_send[tb].append(row_child_send)
+            self.save_child(row_child, qson_child["childs"], row_child_send)
 
     def modify_row(self, qson):
         class_model = self.get_class(qson["db_table"])

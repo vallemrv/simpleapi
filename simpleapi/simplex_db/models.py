@@ -2,7 +2,7 @@
 # @Date:   07-Sep-2017
 # @Email:  valle.mrv@gmail.com
 # @Last modified by:   valle
-# @Last modified time: 04-Mar-2018
+# @Last modified time: 16-Mar-2018
 # @License: Apache license vesion 2.0
 
 import sqlite3
@@ -28,13 +28,11 @@ class Model(object):
     def child_add(qson_child, row, row_child):
         field = qson_child["relation_field"]
         if hasattr(row, field+"_set"):
-            row_child.save()
             try:
                 getattr(row, field+"_set").add(row_child, bulk=False)
             except TypeError:
                 getattr(row, field+"_set").add(row_child)
         else:
-            row_child.save()
             try:
                 getattr(row, field).add(row_child, bulk=False)
             except TypeError:
